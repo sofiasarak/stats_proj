@@ -1,0 +1,80 @@
+---
+title: "Initial Exploration"
+format: html
+editor: visual
+---
+
+```{r}
+library(here)
+library(tidyverse)
+```
+
+```{r}
+# Loading in data
+biota <- read_csv(here("data/biota.csv"))
+sediment <- read_csv(here("data/sediment.csv"))
+waterquality <- read_csv(here("data/waterquality.csv"))
+```
+
+```{r}
+# Joining biota and sediment data
+plot1 <- inner_join(biota, sediment, by = "Station_ID",
+                    relationship = "many-to-many")
+```
+
+
+Chromium
+```{r}
+# Exploratory plot
+ggplot(data = plot1, aes(x = Chromium.y, y = Chromium.x)) +
+  geom_point() +
+  labs(title = "Relationship between sediment chromium and chromium in invertebrates",
+       subtitle = "Upper Clark Fork Basin, Montana",
+       x = "Chromium concentration of sediment",
+       y = "Chromium concentration of biota")
+```
+
+```{r}
+# Picking a random taxa to explore
+unique(plot1$Taxa)
+
+hydro_occ <- plot1 %>% 
+  filter(Taxa == "Hydropsyche occidentalis")
+```
+
+```{r}
+# Hydropsyche occidentalis plot
+ggplot(data = hydro_occ, aes(x = Chromium.y, y = Chromium.x)) +
+  geom_point() +
+  labs(title = "Chromium Conc in the Western Net-spinning Caddisfly",
+       subtitle = "Upper Clark Fork Basin, Montana",
+       x = "Chromium concentration of sediment",
+       y = "Chromium concentration of biota") +
+  geom_smooth(method = "lm")
+```
+
+Nickel
+```{r}
+# Exploratory plot
+ggplot(data = plot1, aes(x = Nickel.y, y = Nickel.x)) +
+  geom_point() +
+  labs(title = "Relationship between sediment nickel and nickel in invertebrates",
+       subtitle = "Upper Clark Fork Basin, Montana",
+       x = "Nickel concentration of sediment",
+       y = "Nickel concentration of biota")
+```
+
+```{r}
+# Selecting one species
+acrto <- plot1 %>% 
+  filter(Taxa == "Arctopsyche grandis")
+
+ggplot(data = acrto, aes(x = Chromium.y, y = Chromium.x)) +
+  geom_point() +
+  labs(title = "Nickel Conc in the Great Net-spinning Caddisfly",
+       subtitle = "Upper Clark Fork Basin, Montana",
+       x = "Nickel concentration of sediment",
+       y = "Nickel concentration of biota") +
+  geom_smooth(method = "lm")
+```
+
