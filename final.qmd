@@ -1,0 +1,113 @@
+---
+title: "Blog post"
+format: html
+editor: visual
+---
+
+```{r}
+#| message: false
+library(here)
+library(tidyverse)
+library(janitor)
+library(ggplot2)
+library(segmented)
+```
+
+```{r}
+#| message: false
+# Loading in data
+biota <- read_csv(here("data/biota.csv")) %>% 
+  clean_names()
+sediment <- read_csv(here("data/sediment.csv")) %>% 
+  clean_names()
+waterquality <- read_csv(here("data/waterquality.csv")) %>% 
+  clean_names()
+```
+
+Describe data set
+- area where the data is from and industries polluting it
+- relationship between water concentration and tissue concentration
+- harmful effects of constituents
+
+- what is the relationship between water concentration and bed sediment concentrations?
+  - combine data sets and pivot longer:
+  - rows that contain "water" or "bed-sediment", as well as concentration of constituent, and constituent as factor
+  - create scatterplots with lines for water and bed-sediment, faceted by constituent
+  
+```{r}
+waterquality <- waterquality %>% 
+  mutate(date = mdy(date), 
+         month = month(date, label = TRUE),
+         year = year(date)) %>% 
+  relocate(c(month, year), .after = date) %>% 
+  filter(month == "Jul") %>% 
+  filter(year == 2021) %>% 
+  dplyr::select(-contains("rc_")) %>% 
+  pivot_longer(cols = nitrate_plus_nitrite:suspended_sediment_concentration,
+               names_to = "constituent",
+               values_to = "concentration_water")
+
+sediment <- sediment %>% 
+  dplyr::select(-contains(c("rc_", "flag"))) %>% 
+  pivot_longer(cols = arsenic:zinc,
+               names_to = "constituent",
+               values_to = "concentration_sediment")
+
+biota <- biota %>% 
+  dplyr::select(-contains(c("rc_", "flag"))) %>% 
+  mutate(lead = as.numeric(lead)) %>% 
+  pivot_longer(cols = arsenic:zinc,
+               names_to = "constituent",
+               values_to = "concentration_biota")
+```
+
+
+```{r}
+enviro <- inner_join(waterquality, sediment, by = "site_name",
+                     relationship = "many-to-many")
+```
+
+to do:
+- in water quality, remove _wf from constituent factors
+
+Describe statistical models
+- gamma
+    - shape and scale, and how they relate to mean and variance
+- segmented
+
+Fit simulated data to models
+- simulate data using rgamma (and mean and variance, transformed into shape and scale)
+
+```{r}
+x <- seq(from = 1, to = 100)
+
+m <- 50 # true mean
+v <- 25  # true variance
+y <- rgamma(n = 100, shape = (m^2)/v, scale = v/m)
+
+simulated_data <- data.frame(x, y)
+
+ggplot(simulated_data, aes(y)) +
+  geom_histogram()
+```
+```{r}
+model <- glm(y ~ x, 
+          data = simulated_data,
+          family = Gamma(link = "identity"))
+```
+
+
+```{r}
+ segmented.glm(obj = fit.glm, seg.Z = ~age, psi = 25)
+```
+
+
+- plot data from rgamma
+- use simulated data and run a segmented model
+- plot line on top of scatter plot
+
+Fit real data to models
+- use water concentrations, controlling for sediment concentration
+  - using the assumption that water is the main thing affecting tissue constituent concentration
+- calculate for arsenic
+- create function that takes in name of constituent

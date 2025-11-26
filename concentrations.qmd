@@ -5,9 +5,23 @@ editor: visual
 ---
 
 ```{r}
+#| message: false
 library(here)
 library(tidyverse)
+library(segmented)
 ```
+
+Questions
+
+(i) does the amount of [chemical name] increase the amount of [chemical name] contamination in macroinvertebrates?
+(ii) is the risk of [chemical name] contamination/ingestion constant across the whole range of concentrations in sediment and water?
+(iii) if the risk is sediment/water-concentration dependent, does a threshold value exist?
+
+
+What I want to do:
+- find effect independent of species
+
+
 
 ```{r}
 # Loading in data
