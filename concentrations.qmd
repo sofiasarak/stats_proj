@@ -92,3 +92,77 @@ ggplot(data = acrto, aes(x = Chromium.y, y = Chromium.x)) +
   geom_smooth(method = "lm")
 ```
 
+
+
+
+```{r}
+x <- seq(from = 1, to = 100)
+
+m <- 50 # true mean
+v <- 25  # true variance
+y <- rgamma(n = 100, shape = (m^2)/v, scale = v/m)
+
+simulated_data <- data.frame(x, y)
+
+model <- glm(y ~ 1, 
+          data = simulated_data,
+          family = Gamma(link = "identity"))
+
+summary <- summary(model)
+
+shape_model <- 1/summary$dispersion
+shape_model
+
+scale_model <- as.numeric(coef(summary))/shape_model
+scale_model
+```
+
+```{r}
+# shape
+shape_input_water <- ((mean(conc_arsenic$concentration_water))^2)/var(conc_arsenic$concentration_water)
+shape_input_water
+
+# scale
+scale_input_water <- var(conc_arsenic$concentration_water/mean(conc_arsenic$concentration_water))
+scale_input_water
+
+# shape
+shape_input_sed <- ((mean(conc_arsenic$concentration_sediment))^2)/var(conc_arsenic$concentration_sediment)
+shape_input_sed
+
+# scale
+scale_input_sed <- var(conc_arsenic$concentration_sediment/mean(conc_arsenic$concentration_sediment))
+scale_input_sed
+```
+
+```{r}
+conc_model_gamma_summary <- summary(conc_model_gamma)
+
+conc_model_gamma$disperson
+```
+
+
+```{r}
+y <- conc_arsenic$concentration_biota
+shape_data <- mean(y)^2 / var(y)
+scale_data <- var(y) / mean(y)
+
+> shape_data
+[1] 0.9844852
+> scale_data
+[1] 8.173274
+```
+
+
+```{r}
+
+```
+
+
+summary(conc_model_gamma)$dispersion
+[1] 0.2678039
+> shape_hat <- 1 / summary(conc_model_gamma)$dispersion
+> shape_hat
+[1] 3.734075
+
+> gamma.shape(conc_model_gamma)

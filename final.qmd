@@ -1,8 +1,49 @@
 ---
 title: "Blog post"
+author: Sofia Sarak
+data: November 31, 2025
 format: html
 editor: visual
 ---
+
+# Exploring Pollutant Accumulation in Invertebrate Based on Concentrations in Water and Sediment
+
+## Using Gamma and Segmented/Breakpoint Statistical Analyses
+
+## Water-Quality, Bed-Sediment, and Invertebrate Tissue Trace-Element Concentrations for Tributaries in the Clark Fork Basin, Montana
+
+Explain where data is from
+
+Describe data set - area where the data is from and industries polluting it - relationship between water concentration and tissue concentration - harmful effects of constituents
+
+
+## Why Gamma and Segmented/Breakpoint Models?
+
+The **segmented/break-point** (or sometimes even referred to as **broken-line**) statistical model is a regression analysis where the relationship between the response and one or more predictor variables contain a break-point at which the relationship between the response and predictor variables changes. This sort of model is common in fields such as epidemiology, occupational medicine, toxicology, and ecology, where it is of interest to assess threshold value where the effect of the covariate changes.
+
+We will will use model in our analysis to explore whether their is a threshold value(s) at which the relationship between trace-element concentration in water and trace-element accumulation in invertebrates changes.
+
+Y∼Gamma(μ, k),log(μ)=β0​+β1​x+β2​(x−τ)
+
+The segmented model must be applied to an already existing linear regression model, as it builds off of an already-analyzed relationship between the response and predictor variable(s) -- segmented analysis simply determines where the analyzed relationship changes.
+
+Therefore, for the first step of our analysis we will use a **gamma distribution** statistical model. It is appropriate for data that contains continuous variables that are always positive and have skewed distributions. Our data matches this description, as trace-element concentrations are never negative (and our data contains no values of 0), and higher concentrations occur less frequently than lower ones.
+
+The gamma distribution is made up of the parameters shape and scale, which relate to the mean and variance of the data.
+
+
+Through our multi-step analysis, we aim to answer the following questions:
+
+1. Does trace-element concentration in water increase trace-element concentration in macroinvertebrates?
+2. Is the risk of trace-element contamination/ingestion constant across the whole range of concentrations in sediment and water?
+3. If the risk is sediment/water-concentration dependent, does a threshold value exist?
+
+
+**Null Hypothesis:** There is no relationship between trace-element concentration in water and biota, and therefore a breakpoint doesn't exist.
+
+**Alternative Hypthesis:** There is a positive relationship between trace-element concentration in water and biota, and a breakpoint does exist.
+
+## The Analysis
 
 ```{r}
 #| message: false
@@ -24,17 +65,8 @@ waterquality <- read_csv(here("data/waterquality.csv")) %>%
   clean_names()
 ```
 
-Describe data set
-- area where the data is from and industries polluting it
-- relationship between water concentration and tissue concentration
-- harmful effects of constituents
-
-- what is the relationship between water concentration and bed sediment concentrations?
-  - combine data sets and pivot longer:
-  - rows that contain "water" or "bed-sediment", as well as concentration of constituent, and constituent as factor
-  - create scatterplots with lines for water and bed-sediment, faceted by constituent
-  
 ```{r}
+#| warning: false
 waterquality <- waterquality %>% 
   mutate(date = mdy(date), 
          month = month(date, label = TRUE),
@@ -77,44 +109,31 @@ conc <- inner_join(enviro, biota, by = c("constituent", "station_id"),
                    relationship = "many-to-many")
 ```
 
-Describe statistical models
-- gamma
-    - shape and scale, and how they relate to mean and variance
-- segmented
-
-
-Create model
+Models for arsenic
 ```{r}
 conc_arsenic <- conc %>% 
   filter(constituent == "arsenic")
+
+conc_arsenic <- conc_arsenic %>% 
+  mutate(sediment_conc_bins = cut(conc_arsenic$concentration_sediment,breaks = c(0, 50, 100, 150)))
 
 conc_model_gamma <- glm(concentration_biota ~ concentration_water + concentration_sediment, 
                    data = conc_arsenic, # data remains unchanged
                    family = Gamma(link = "log")) # family and link function
 
-conc_model_seg <- segmented(obj = conc_model_gamma, seg.Z = ~concentration_water, psi = 10)
+conc_model_seg <- segmented(obj = conc_model_gamma, seg.Z = ~concentration_water + concentration_sediment)
 ```
 
-
-Fit simulated data to models
-- simulate data using rgamma (and mean and variance, transformed into shape and scale)
-
+Creating simulated data
 ```{r}
 # Create prediction grid with levels of water and sediment concentrations
 pred_grid <- expand_grid(concentration_water = 1:30,
                          concentration_sediment = 1:150)
-
-concentration_pred <- pred_grid %>% 
-  mutate(biota_conc_pred_guass = predict(object = concentration_model,
-                                        newdata = pred_grid,
-                                        type = "link"),
-         biota_conc_pred_seg = predict(object = conc_model_seg,
-                                       newdata = pred_grid,
-                                       type = "link") )
 ```
 
+Applying gamma model to simulated values
 ```{r}
-conc_model_se <- predict(object = conc_model_gauss,
+conc_model_gamma_se <- predict(object = conc_model_gamma,
                           newdata = pred_grid,
                           type = "link", # stay in link space
                           se.fit = TRUE)
@@ -126,18 +145,13 @@ concentration_pred <- pred_grid %>%
     log_conc_se = conc_model_se$se.fit,
     log_conc_lwr = qnorm(0.025, mean = log_conc, sd = log_conc_se),
     log_conc_upr = qnorm(0.975, mean = log_conc, sd = log_conc_se),
-    # undo the link function using linkinv
+    # undo the link function -- in this case log --  using exp()
     conc = exp(log_conc),
     conc_lwr = exp(log_conc_lwr),
     conc_upr = exp(log_conc_upr))
 ```
 
-```{r}
-ggplot(concentration_pred, aes(x = concentration_water, y = conc)) +
-  geom_ribbon(aes(ymin = conc_lwr, ymax = conc_upr), alpha = 0.2) +
-  geom_line()
-```
-
+Gamma Plot
 ```{r}
 conc_model_pred_filtered <- concentration_pred %>% 
   filter(concentration_sediment %in% c(50, 100, 150))
@@ -146,116 +160,47 @@ ggplot(conc_model_pred_filtered, aes(x = concentration_water, y = conc)) +
   geom_line(aes(color = as_factor(concentration_sediment))) +
   geom_ribbon(aes(ymin = conc_lwr, ymax = conc_upr, fill = as_factor(concentration_sediment)),
               alpha = 0.2) + 
-  labs(title = "Gamma distribution")
+  geom_point(data = conc_arsenic, aes(x = concentration_water, y = concentration_biota, color = sediment_conc_bins)) +
+  labs(title = "Gamma distribution") +
+  xlim(0, 25) +
+  ylim(0, 100) 
 ```
 
-
+Applying segmented model to simulated values
 ```{r}
-concentration_pred <- concentration_pred %>%
-  mutate(biota_conc_seg = exp(biota_conc_pred_seg))
+conc_model_seg_se <- predict(object = conc_model_seg,
+                          newdata = pred_grid,
+                          type = "link", # stay in link space
+                          se.fit = TRUE)
 
-ggplot(data = conc_model_pred_filtered, aes(x = concentration_water, y = biota_conc_seg)) +
-  geom_line(aes(color = as_factor(concentration_sediment)))
-
+concentration_pred_seg <- pred_grid %>% 
+  mutate(log_conc_seg = conc_model_seg_se$fit,
+    # 95% CI in link space
+    log_conc_seg_se = conc_model_seg_se$se.fit,
+    log_conc_seg_lwr = qnorm(0.025, mean = log_conc_seg, sd = log_conc_seg_se),
+    log_conc_seg_upr = qnorm(0.975, mean = log_conc_seg, sd = log_conc_seg_se),
+    # undo the link function -- in this case log --  using exp()
+    conc = exp(log_conc_seg),
+    conc_lwr = exp(log_conc_seg_lwr),
+    conc_upr = exp(log_conc_seg_upr))
 ```
 
-
+Creating segmented plot
 ```{r}
-ggplot(data = conc_model_pred_filtered, aes(x = concentration_water, y = biota_conc_seg)) +
+conc_pred_seg_filtered <- concentration_pred_seg %>% 
+  filter(concentration_sediment %in% c(50, 100, 150))
+
+ggplot(data = conc_pred_seg_filtered, aes(x = concentration_water, y = conc)) +
   geom_line(aes(color = as_factor(concentration_sediment))) +
-  xlim(0, 20) +
-  ylim(0, 150) 
+  geom_point(data = conc_arsenic, aes(x = concentration_water, y = concentration_biota, color = sediment_conc_bins)) +
+  geom_ribbon(data = conc_pred_seg_filtered, aes(ymin = conc_lwr, ymax = conc_upr, fill = as_factor(concentration_sediment)),
+              alpha = 0.2) +
+  xlim(0, 25) +
+  ylim(0, 100) 
 ```
 
-```{r}
-ggplot(data = conc_model_pred_filtered, aes(x = concentration_water, y = biota_conc_seg)) +
-  geom_line(aes(color = as_factor(concentration_sediment))) +
-  xlim(0, 20) +
-  ylim(0, 150) +
-  geom_point(data = conc_arsenic, aes(x = concentration_water, y = concentration_biota))
-```
+## Interpretation
+
+Visually, it appears that both a positive relationship and a breakpoint exist between trace-element concentration in water and biota. To confirm, we can take a look at the model summary ouputs.
 
 
-To do
-- figure out how to plot segmented model
-- and plot with original data
-
-- figure out if curved portion of segemented model is correct?
-- filter conc_arsenic/put biota conc into bins, and then color by those bins
-
-
-- using what I did below, confirm that model returns mean and variance of data
-- figure out how to check inputs and outputs of seg model
-
-
-
-
-
-```{r}
-x <- seq(from = 1, to = 100)
-
-m <- 50 # true mean
-v <- 25  # true variance
-y <- rgamma(n = 100, shape = (m^2)/v, scale = v/m)
-
-simulated_data <- data.frame(x, y)
-
-model <- glm(y ~ 1, 
-          data = simulated_data,
-          family = Gamma(link = "identity"))
-
-summary <- summary(model)
-
-shape_model <- 1/summary$dispersion
-shape_model
-
-scale_model <- as.numeric(coef(summary))/shape_model
-scale_model
-```
-
-```{r}
-# shape
-shape_input_water <- (mean(conc_arsenic$concentration_water)^2)/var(conc_arsenic$concentration_water)
-shape_input_water
-
-# scale
-scale_input_water <- var(conc_arsenic$concentration_water/mean(conc_arsenic$concentration_water))
-scale_input_water
-
-# shape
-shape_input_sed <- (mean(conc_arsenic$concentration_sediment)^2)/var(conc_arsenic$concentration_sediment)
-shape_input_sed
-
-# scale
-scale_input_sed <- var(conc_arsenic$concentration_sediment/mean(conc_arsenic$concentration_sediment))
-scale_input_sed
-```
-```{r}
-conc_model_gamma_summary <- summary(conc_model_gamma)
-```
-
-
-
-```{r}
-ggplot(simulated_data, aes(y)) +
-  geom_density()
-```
-```{r}
-
-```
-
-
-```{r}
- segmented.glm(obj = fit.glm, seg.Z = ~age, psi = 25)
-```
-
-
-- plot data from rgamma
-- use simulated data and run a segmented model
-- plot line on top of scatter plot
-
-Fit real data to models
-- use water concentrations, controlling for sediment concentration
-  - using the assumption that water is the main thing affecting tissue constituent concentration
-- calculate for arsenic
-- create function that takes in name of constituent
