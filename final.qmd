@@ -145,7 +145,34 @@ conc_model_pred_filtered <- concentration_pred %>%
 ggplot(conc_model_pred_filtered, aes(x = concentration_water, y = conc)) +
   geom_line(aes(color = as_factor(concentration_sediment))) +
   geom_ribbon(aes(ymin = conc_lwr, ymax = conc_upr, fill = as_factor(concentration_sediment)),
-              alpha = 0.2)
+              alpha = 0.2) + 
+  labs(title = "Gamma distribution")
+```
+
+
+```{r}
+concentration_pred <- concentration_pred %>%
+  mutate(biota_conc_seg = exp(biota_conc_pred_seg))
+
+ggplot(data = conc_model_pred_filtered, aes(x = concentration_water, y = biota_conc_seg)) +
+  geom_line(aes(color = as_factor(concentration_sediment)))
+
+```
+
+
+```{r}
+ggplot(data = conc_model_pred_filtered, aes(x = concentration_water, y = biota_conc_seg)) +
+  geom_line(aes(color = as_factor(concentration_sediment))) +
+  xlim(0, 20) +
+  ylim(0, 150) 
+```
+
+```{r}
+ggplot(data = conc_model_pred_filtered, aes(x = concentration_water, y = biota_conc_seg)) +
+  geom_line(aes(color = as_factor(concentration_sediment))) +
+  xlim(0, 20) +
+  ylim(0, 150) +
+  geom_point(data = conc_arsenic, aes(x = concentration_water, y = concentration_biota))
 ```
 
 
@@ -153,8 +180,12 @@ To do
 - figure out how to plot segmented model
 - and plot with original data
 
+- figure out if curved portion of segemented model is correct?
+- filter conc_arsenic/put biota conc into bins, and then color by those bins
+
 
 - using what I did below, confirm that model returns mean and variance of data
+- figure out how to check inputs and outputs of seg model
 
 
 
@@ -184,12 +215,23 @@ scale_model
 
 ```{r}
 # shape
-shape_input <- (mean(simulated_data$y)^2)/var(simulated_data$y)
-shape_input
+shape_input_water <- (mean(conc_arsenic$concentration_water)^2)/var(conc_arsenic$concentration_water)
+shape_input_water
 
 # scale
-scale_input <- var(simulated_data$y/mean(simulated_data$y))
-scale_input
+scale_input_water <- var(conc_arsenic$concentration_water/mean(conc_arsenic$concentration_water))
+scale_input_water
+
+# shape
+shape_input_sed <- (mean(conc_arsenic$concentration_sediment)^2)/var(conc_arsenic$concentration_sediment)
+shape_input_sed
+
+# scale
+scale_input_sed <- var(conc_arsenic$concentration_sediment/mean(conc_arsenic$concentration_sediment))
+scale_input_sed
+```
+```{r}
+conc_model_gamma_summary <- summary(conc_model_gamma)
 ```
 
 
