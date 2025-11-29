@@ -45,38 +45,120 @@ waterquality <- waterquality %>%
   dplyr::select(-contains("rc_")) %>% 
   pivot_longer(cols = nitrate_plus_nitrite:suspended_sediment_concentration,
                names_to = "constituent",
-               values_to = "concentration_water")
+               values_to = "concentration_water") %>% 
+   mutate(station_id = as.character(station_id))
+
+waterquality$constituent <- gsub("_wf$", "", waterquality$constituent)
+waterquality$constituent <- gsub("_wu$", "", waterquality$constituent)
 
 sediment <- sediment %>% 
   dplyr::select(-contains(c("rc_", "flag"))) %>% 
   pivot_longer(cols = arsenic:zinc,
                names_to = "constituent",
-               values_to = "concentration_sediment")
+               values_to = "concentration_sediment") %>% 
+  mutate(station_id = as.character(station_id))
 
 biota <- biota %>% 
   dplyr::select(-contains(c("rc_", "flag"))) %>% 
   mutate(lead = as.numeric(lead)) %>% 
   pivot_longer(cols = arsenic:zinc,
                names_to = "constituent",
-               values_to = "concentration_biota")
+               values_to = "concentration_biota") %>% 
+  mutate(station_id = as.character(station_id))
 ```
-
 
 ```{r}
-enviro <- inner_join(waterquality, sediment, by = "site_name",
-                     relationship = "many-to-many")
-```
+waterquality_filtered <- waterquality %>%
+  filter(constituent %in% sediment$constituent)
 
-to do:
-- in water quality, remove _wf from constituent factors
+enviro <- inner_join(waterquality_filtered, sediment, by = c("constituent", "station_id"), 
+                     relationship = "many-to-many")
+conc <- inner_join(enviro, biota, by = c("constituent", "station_id"),
+                   relationship = "many-to-many")
+```
 
 Describe statistical models
 - gamma
     - shape and scale, and how they relate to mean and variance
 - segmented
 
+
+Create model
+```{r}
+conc_arsenic <- conc %>% 
+  filter(constituent == "arsenic")
+
+conc_model_gamma <- glm(concentration_biota ~ concentration_water + concentration_sediment, 
+                   data = conc_arsenic, # data remains unchanged
+                   family = Gamma(link = "log")) # family and link function
+
+conc_model_seg <- segmented(obj = conc_model_gamma, seg.Z = ~concentration_water, psi = 10)
+```
+
+
 Fit simulated data to models
 - simulate data using rgamma (and mean and variance, transformed into shape and scale)
+
+```{r}
+# Create prediction grid with levels of water and sediment concentrations
+pred_grid <- expand_grid(concentration_water = 1:30,
+                         concentration_sediment = 1:150)
+
+concentration_pred <- pred_grid %>% 
+  mutate(biota_conc_pred_guass = predict(object = concentration_model,
+                                        newdata = pred_grid,
+                                        type = "link"),
+         biota_conc_pred_seg = predict(object = conc_model_seg,
+                                       newdata = pred_grid,
+                                       type = "link") )
+```
+
+```{r}
+conc_model_se <- predict(object = conc_model_gauss,
+                          newdata = pred_grid,
+                          type = "link", # stay in link space
+                          se.fit = TRUE)
+
+
+concentration_pred <- pred_grid %>% 
+  mutate(log_conc = conc_model_se$fit,
+    # 95% CI in link space
+    log_conc_se = conc_model_se$se.fit,
+    log_conc_lwr = qnorm(0.025, mean = log_conc, sd = log_conc_se),
+    log_conc_upr = qnorm(0.975, mean = log_conc, sd = log_conc_se),
+    # undo the link function using linkinv
+    conc = exp(log_conc),
+    conc_lwr = exp(log_conc_lwr),
+    conc_upr = exp(log_conc_upr))
+```
+
+```{r}
+ggplot(concentration_pred, aes(x = concentration_water, y = conc)) +
+  geom_ribbon(aes(ymin = conc_lwr, ymax = conc_upr), alpha = 0.2) +
+  geom_line()
+```
+
+```{r}
+conc_model_pred_filtered <- concentration_pred %>% 
+  filter(concentration_sediment %in% c(50, 100, 150))
+
+ggplot(conc_model_pred_filtered, aes(x = concentration_water, y = conc)) +
+  geom_line(aes(color = as_factor(concentration_sediment))) +
+  geom_ribbon(aes(ymin = conc_lwr, ymax = conc_upr, fill = as_factor(concentration_sediment)),
+              alpha = 0.2)
+```
+
+
+To do
+- figure out how to plot segmented model
+- and plot with original data
+
+
+- using what I did below, confirm that model returns mean and variance of data
+
+
+
+
 
 ```{r}
 x <- seq(from = 1, to = 100)
@@ -87,13 +169,37 @@ y <- rgamma(n = 100, shape = (m^2)/v, scale = v/m)
 
 simulated_data <- data.frame(x, y)
 
-ggplot(simulated_data, aes(y)) +
-  geom_histogram()
-```
-```{r}
-model <- glm(y ~ x, 
+model <- glm(y ~ 1, 
           data = simulated_data,
           family = Gamma(link = "identity"))
+
+summary <- summary(model)
+
+shape_model <- 1/summary$dispersion
+shape_model
+
+scale_model <- as.numeric(coef(summary))/shape_model
+scale_model
+```
+
+```{r}
+# shape
+shape_input <- (mean(simulated_data$y)^2)/var(simulated_data$y)
+shape_input
+
+# scale
+scale_input <- var(simulated_data$y/mean(simulated_data$y))
+scale_input
+```
+
+
+
+```{r}
+ggplot(simulated_data, aes(y)) +
+  geom_density()
+```
+```{r}
+
 ```
 
 
