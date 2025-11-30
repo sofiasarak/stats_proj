@@ -224,7 +224,14 @@ ggsave('figures/all_plots_2.png', all_plots_2, width = 10, height = 7)
 
 ```{r}
 ggplot(data = conc, aes(x = concentration_water, y = concentration_biota)) + 
-  facet_wrap(~constituent)
+  geom_point(size = 0.75) +
+  facet_wrap(~constituent, ncol = 4, scales = "free") +
+  theme_minimal() +
+  theme(strip.background = element_rect("#acd0f2")) +
+  labs(x = "Water (µg/L)",
+       y = "Biota (µg/L)",
+       title = "Trace-Element Concentrations") +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 
@@ -277,13 +284,31 @@ conc_model_pred_filtered <- concentration_pred %>%
   filter(concentration_sediment %in% c(50, 100, 150))
 
 ggplot(conc_model_pred_filtered, aes(x = concentration_water, y = conc)) +
+  
+  # Predicted values as a line, colored by sediment concentration
   geom_line(aes(color = as_factor(concentration_sediment))) +
-  geom_ribbon(aes(ymin = conc_lwr, ymax = conc_upr, fill = as_factor(concentration_sediment)),
-              alpha = 0.2) + 
-  geom_point(data = conc_arsenic, aes(x = concentration_water, y = concentration_biota, color = sediment_conc_bins)) +
-  labs(title = "Gamma distribution") +
-  xlim(0, 25) +
-  ylim(0, 100) 
+  
+  # 95% CIs as ribbon, colored by sediment concentration
+  geom_ribbon(aes(ymin = conc_lwr, ymax = conc_upr, 
+                  fill = as_factor(concentration_sediment)), alpha = 0.2) + 
+  
+  # Raw data as points, colored by sediment concentration bins
+  geom_point(data = conc_arsenic, aes(x = concentration_water, 
+                                      y = concentration_biota, 
+                                      color = sediment_conc_bins)) +
+  
+  # Aesthetics
+  scale_color_manual(name = "Sediment (µg/g)", values = c("seagreen", "goldenrod", "mediumorchid4", 
+                                                          "seagreen", "goldenrod", "mediumorchid4")) +
+  scale_fill_manual(values = c("seagreen", "goldenrod", "mediumorchid4")) +
+  labs(x = "Water (µg/L)",
+       y = "Biota (µg/L)",
+       title = "Predicted Arsenic Concentrations (Gamma Model)",
+       color = "Sediment (µg/g) Bins") +
+  guides(fill = "none") +
+  xlim(c(0, 25)) +
+  ylim(c(0, 100)) +
+  theme_minimal()
 ```
 
 Applying segmented model to simulated values
@@ -315,12 +340,38 @@ ggplot(data = conc_pred_seg_filtered, aes(x = concentration_water, y = conc)) +
   geom_point(data = conc_arsenic, aes(x = concentration_water, y = concentration_biota, color = sediment_conc_bins)) +
   geom_ribbon(data = conc_pred_seg_filtered, aes(ymin = conc_lwr, ymax = conc_upr, fill = as_factor(concentration_sediment)),
               alpha = 0.2) +
+  
+  scale_color_manual(name = "Sediment (µg/g)", values = c("seagreen", "goldenrod", "mediumorchid4", 
+                                                          "seagreen", "goldenrod", "mediumorchid4")) +
+  scale_fill_manual(values = c("seagreen", "goldenrod", "mediumorchid4")) +
+  labs(x = "Water (µg/L)",
+       y = "Biota (µg/L)",
+       title = "Predicted Arsenic Concentrations (Break-Point Model)",
+       color = "Sediment (µg/g) Bins") +
+  guides(fill = "none") +
   xlim(0, 25) +
-  ylim(0, 100) 
+  ylim(0, 100) +
+  theme_minimal()
 ```
 
 ## Interpretation
 
-Visually, it appears that both a positive relationship and a breakpoint exist between trace-element concentration in water and biota. To confirm, we can take a look at the model summary ouputs.
+Visually, it appears that both a positive relationship and a break-point exist between trace-element concentration in water and biota. To confirm, we can take a look at the model summary ouputs.
 
 
+## Generalized Function
+
+Our initial analysis only applied the gamma and segmented model to arsenic, but this dataset contains 6 other trace-elements to explore. To speed up the process, a function can be made. The inputs to the function `trace_element_model`, are as follows:
+
+- `trace-element`: a string containing the trace-element, from the data, you wish to model (all lowercase)
+- `bins`: a vector containing the bin values (starting at 0 and ending with the max value) of the trace-element
+- `conc_water_max` & `conc_sediment_max`: the maximum values that a grid of predicted values will be made with
+- `filtered_sed`: which 3 values of sediment concentrations you wish to plot (should match `bins`, but without the 0)
+- `xlim` & `ylim`: when plotting, what range of x's and y's should the graph include? (should be based on trace-element concentration range)
+
+Function
+```{r}
+
+```
+
+We can use the function to calculate predictions and create graphs for the other 6 trace elements.
