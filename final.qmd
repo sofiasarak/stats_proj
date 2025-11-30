@@ -19,9 +19,59 @@ Describe data set - area where the data is from and industries polluting it - re
 
 ## Why Gamma and Segmented/Breakpoint Models?
 
+### Model 1: Segmented
+
 The **segmented/break-point** (or sometimes even referred to as **broken-line**) statistical model is a regression analysis where the relationship between the response and one or more predictor variables contain a break-point at which the relationship between the response and predictor variables changes. This sort of model is common in fields such as epidemiology, occupational medicine, toxicology, and ecology, where it is of interest to assess threshold value where the effect of the covariate changes.
 
 We will will use model in our analysis to explore whether their is a threshold value(s) at which the relationship between trace-element concentration in water and trace-element accumulation in invertebrates changes.
+
+To test this analysis on simulated data, we can do so by feeding it data that has a known break-point, such as that below.
+
+```{r}
+#| message: false
+#| echo: false
+library(here)
+library(tidyverse)
+library(janitor)
+library(ggplot2)
+library(segmented)
+library(patchwork)
+```
+
+```{r}
+#| warning: false
+#| echo: false
+# Simulate data frame with known break-point of 50
+sample_data <- data.frame(x = seq(1:100))
+
+sample_data <- sample_data %>% 
+  mutate(y = if_else(x < 50, true = x, false = x*2-50))
+
+ggplot(data = sample_data, aes(x = x, y = y)) +
+  geom_line(color = "red") +
+  geom_vline(xintercept = 50, color = "gray", linetype = "dashed") + 
+  theme_light() +
+  labs(title = "Simulated Data with Known Breakpoint at x = 50")
+```
+
+To follow the steps of a segmented model, we first apply a linear regression model to the data, then the segmented model.
+```{r}
+# Run lm model on it
+sample_model_seg_1 <- lm(data = sample_data, y~x)
+
+# Run segmented model on lm (note: function comes from the R package "segmented")
+sample_model_seg_2 <- segmented(sample_model_seg_1, seg.Z = ~x)
+```
+
+If we were successful, the summary should return an estimated breakpoint at x = 50.
+```{r}
+# Does it return a break-point of 50?
+summary(sample_model_seg_2)
+```
+
+It does!
+
+### Model 2: Gamma
 
 Y∼Gamma(μ, k),log(μ)=β0​+β1​x+β2​(x−τ)
 
@@ -29,7 +79,7 @@ The segmented model must be applied to an already existing linear regression mod
 
 Therefore, for the first step of our analysis we will use a **gamma distribution** statistical model. It is appropriate for data that contains continuous variables that are always positive and have skewed distributions. Our data matches this description, as trace-element concentrations are never negative (and our data contains no values of 0), and higher concentrations occur less frequently than lower ones.
 
-The gamma distribution is made up of the parameters shape and scale, which relate to the mean and variance of the data.
+The gamma distribution is made up of the parameters shape and scale, which relate to the mean and variance of the data. We test the model using simulated data below.
 
 
 Through our multi-step analysis, we aim to answer the following questions:
@@ -47,15 +97,7 @@ Through our multi-step analysis, we aim to answer the following questions:
 
 ```{r}
 #| message: false
-library(here)
-library(tidyverse)
-library(janitor)
-library(ggplot2)
-library(segmented)
-```
-
-```{r}
-#| message: false
+#| echo: false
 # Loading in data
 biota <- read_csv(here("data/biota.csv")) %>% 
   clean_names()
@@ -67,6 +109,7 @@ waterquality <- read_csv(here("data/waterquality.csv")) %>%
 
 ```{r}
 #| warning: false
+#| echo: false
 waterquality <- waterquality %>% 
   mutate(date = mdy(date), 
          month = month(date, label = TRUE),
@@ -109,6 +152,83 @@ conc <- inner_join(enviro, biota, by = c("constituent", "station_id"),
                    relationship = "many-to-many")
 ```
 
+```{r}
+water_plot <- ggplot(data = conc, aes(x = constituent, y = concentration_water)) +
+  geom_boxplot(aes(fill = constituent)) +
+  theme_minimal() +
+  labs(x = "Trace-Element",
+       y = "Concentration (µg/L)",
+       title = "Water Quality") +
+  scale_fill_brewer(name = "Trace-Element", palette = "Dark2") +
+  theme(axis.text.x = element_text(angle = -45))
+                                   
+sediment_plot <- ggplot(data = conc, aes(x = constituent, y = concentration_sediment)) +
+  geom_boxplot(aes(fill = constituent)) +
+  theme_minimal() +
+  labs(x = "Trace-Element",
+       y = "Concentration (µg/L)",
+       title = "Sediment") +
+  scale_fill_brewer(name = "Trace-Element", palette = "Dark2") 
+
+invert_plot <- ggplot(data = conc, aes(x = constituent, y = concentration_biota)) +
+  geom_boxplot(aes(fill = constituent)) +
+  theme_minimal() +
+  labs(x = "Trace-Element",
+       y = "Concentration (µg/L)",
+       title = "Invertebrate") +
+  scale_fill_brewer(name = "Trace-Element", palette = "Dark2")
+
+all_plots <- water_plot / sediment_plot / invert_plot +
+  plot_layout(axis_titles = 'collect',
+              guides = 'collect')
+
+ggsave('figures/all_plots.png', all_plots, width = 10, height = 7)
+
+conc_plot2 <- conc %>% 
+  filter(constituent %in% c("arsenic", "cadnium","copper","lead","zinc"))
+```
+
+
+```{r}
+water_plot_2 <- ggplot(data = conc_plot2, aes(x = constituent, y = concentration_water)) +
+  geom_boxplot(aes(fill = constituent)) +
+  theme_minimal() +
+  labs(x = "Trace-Element",
+       y = "Concentration (µg/L)",
+       title = "Water Quality") +
+  scale_fill_brewer(name = "Trace-Element", palette = "Dark2") +
+  theme(axis.text.x = element_text(angle = -45))
+                                   
+sediment_plot_2 <- ggplot(data = conc_plot2, aes(x = constituent, y = concentration_sediment)) +
+  geom_boxplot(aes(fill = constituent)) +
+  theme_minimal() +
+  labs(x = "Trace-Element",
+       y = "Concentration (µg/L)",
+       title = "Sediment") +
+  scale_fill_brewer(name = "Trace-Element", palette = "Dark2") 
+
+invert_plot_2 <- ggplot(data = conc_plot2, aes(x = constituent, y = concentration_biota)) +
+  geom_boxplot(aes(fill = constituent)) +
+  theme_minimal() +
+  labs(x = "Trace-Element",
+       y = "Concentration (µg/L)",
+       title = "Invertebrate") +
+  scale_fill_brewer(name = "Trace-Element", palette = "Dark2")
+
+all_plots_2 <- water_plot_2 / sediment_plot_2 / invert_plot_2 +
+  plot_layout(axis_titles = 'collect',
+              guides = 'collect')
+
+ggsave('figures/all_plots_2.png', all_plots_2, width = 10, height = 7)
+```
+
+```{r}
+ggplot(data = conc, aes(x = concentration_water, y = concentration_biota)) + 
+  facet_wrap(~constituent)
+```
+
+
+
 Models for arsenic
 ```{r}
 conc_arsenic <- conc %>% 
@@ -140,9 +260,9 @@ conc_model_gamma_se <- predict(object = conc_model_gamma,
 
 
 concentration_pred <- pred_grid %>% 
-  mutate(log_conc = conc_model_se$fit,
+  mutate(log_conc = conc_model_gamma_se$fit,
     # 95% CI in link space
-    log_conc_se = conc_model_se$se.fit,
+    log_conc_se = conc_model_gamma_se$se.fit,
     log_conc_lwr = qnorm(0.025, mean = log_conc, sd = log_conc_se),
     log_conc_upr = qnorm(0.975, mean = log_conc, sd = log_conc_se),
     # undo the link function -- in this case log --  using exp()
