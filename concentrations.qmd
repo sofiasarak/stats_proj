@@ -166,3 +166,23 @@ summary(conc_model_gamma)$dispersion
 [1] 3.734075
 
 > gamma.shape(conc_model_gamma)
+
+```{r}
+conc_model_gamma_se <- predict(object = conc_model_gamma,
+                          newdata = pred_grid,
+                          type = "link", # stay in link space
+                          se.fit = TRUE)
+
+
+concentration_pred <- pred_grid %>% 
+  mutate(log_conc = conc_model_gamma_se$fit,
+    # 95% CI in link space
+    log_conc_se = conc_model_gamma_se$se.fit,
+    log_conc_lwr = qnorm(0.025, mean = log_conc, sd = log_conc_se),
+    log_conc_upr = qnorm(0.975, mean = log_conc, sd = log_conc_se),
+    # undo the link function -- in this case log --  using exp()
+    conc = exp(log_conc),
+    conc_lwr = exp(log_conc_lwr),
+    conc_upr = exp(log_conc_upr))
+```
+

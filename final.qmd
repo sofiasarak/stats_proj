@@ -12,6 +12,20 @@ editor: visual
 
 ## Water-Quality, Bed-Sediment, and Invertebrate Tissue Trace-Element Concentrations for Tributaries in the Clark Fork Basin, Montana
 
+This data set is sourced from the USGS National Water Information System database. It contains trace-element concentration values of water, sediment, and invertebrate species (mainly Caddisflies) across the tributaries of the tributaries in the Clark Fork Basin, Montana (July 2021).
+
+[insert map from paper]
+
+Water, bed sediment, and invertebrate tissue were sampled in streams from as part of a monitoring program in the Clark Fork Basin. monitor trace elements associated with historical mining and smelting activities. Current (as of 2020) land uses are primarily cattle production, logging, mining, residential development, and recreation. Large-scale mining and smelting were prevalent in the basin for more than 100 years but are now either discontinued or reduced in scale. Concern about the toxicity of trace elements to the aquatic ecosystem and human health has resulted in a comprehensive effort by State, Federal, Tribal, and private entities to characterize the aquatic resources in the Clark Fork Basin. This effort was designed to guide and monitor remedial activities and to evaluate the effectiveness of remediation and cleanup.
+
+Sampling methods for the three elements can be found in the original report. (link). In this analysis, we use the six elements that were tested across water, sediment, and invertebrate tissue, in an effort to explore the impact of water contamination level on trace-element accumulation in tissue. 
+
+Trace-element concentration in water is treated as the main predictor variable for the concentration of **said** trace-element in invertebrate tissue. This is because the species tested (as most marine invertebrates generally) obtain oxygen through **input8* with their gills. This involves the direct ingestion of water, causing the accumulation of pollutant is tissue (cite). 
+
+Sediment concentration acts as both a source and sink of trace-elements in relation to water, as it both takes up and stores over the long term (potentially later releasing) trace-elements. Species may have an effect on trace-element accumulation, but it will not be explored in this analysis.
+
+![](images/dag.png)
+
 Explain where data is from
 
 Describe data set - area where the data is from and industries polluting it - relationship between water concentration and tissue concentration - harmful effects of constituents
@@ -277,6 +291,16 @@ concentration_pred <- pred_grid %>%
     conc_lwr = exp(log_conc_lwr),
     conc_upr = exp(log_conc_upr))
 ```
+
+```{r}
+dispersion <- summary(conc_model_gamma)$dispersion
+
+concentration_pred <- pred_grid %>% 
+  mutate(log_conc = conc_model_gamma$fitted.values,
+         conc = exp(log_conc),
+         log_conc_lwr = qgamma(0.025, shape = 1/dispersion, scale = mean(conc)/dispersion))
+```
+
 
 Gamma Plot
 ```{r}
